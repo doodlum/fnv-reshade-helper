@@ -1,24 +1,24 @@
 #include <NVSE/PluginAPI.h>
 #include <reshade/reshade.hpp>
 
-using namespace reshade::api;
+using namespace reshade;
 
 HMODULE m_hModule = nullptr;
 
-static effect_runtime* m_runtime = nullptr;
-static command_list*   m_cmdlist = nullptr;
-static resource_view   m_rtv;
-static resource_view   m_rtv_srgb;
-
-struct __declspec(uuid("7251932A-ADAF-4DFC-B5CB-9A4E8CD5D6EB")) device_data
-{
-	effect_runtime* main_runtime = nullptr;
-};
-
+api::effect_runtime* m_runtime = nullptr;
+api::command_list*       m_cmdlist = nullptr;
+api::resource_view       m_rtv;
+api::resource_view       m_rtv_srgb;
+api::resource_view       true_rtv;
 bool                     validPass = false;
 std::vector<std::string> backupTechniques;
 
-void on_reshade_begin_effects(effect_runtime* runtime, command_list* cmd_list, resource_view rtv, resource_view rtv_srgb)
+struct __declspec(uuid("7251932A-ADAF-4DFC-B5CB-9A4E8CD5D6EB")) device_data
+{
+	api::effect_runtime* main_runtime = nullptr;
+};
+
+void on_reshade_begin_effects(api::effect_runtime* runtime, api::command_list* cmd_list, api::resource_view rtv, api::resource_view rtv_srgb)
 {
 	m_runtime = runtime;
 	m_cmdlist = cmd_list;
@@ -26,7 +26,7 @@ void on_reshade_begin_effects(effect_runtime* runtime, command_list* cmd_list, r
 	m_rtv_srgb = rtv_srgb;
 	backupTechniques.clear();
 	if (!validPass) {
-		m_runtime->enumerate_techniques(nullptr, [&](reshade::api::effect_runtime* runtime, reshade::api::effect_technique technique) {
+		m_runtime->enumerate_techniques(nullptr, [&](api::effect_runtime* runtime, api::effect_technique technique) {
 			char buffer[256];
 			runtime->get_technique_name(technique, buffer);
 			std::string name = buffer;
@@ -38,10 +38,10 @@ void on_reshade_begin_effects(effect_runtime* runtime, command_list* cmd_list, r
 	}
 }
 
-void on_reshade_finish_effects(effect_runtime* runtime, command_list* cmd_list, resource_view rtv, resource_view rtv_srgb)
+void on_reshade_finish_effects(api::effect_runtime* runtime, api::command_list* cmd_list, api::resource_view rtv, api::resource_view rtv_srgb)
 {
 	if (!validPass) {
-		m_runtime->enumerate_techniques(nullptr, [&](reshade::api::effect_runtime* runtime, reshade::api::effect_technique technique) {
+		m_runtime->enumerate_techniques(nullptr, [&](api::effect_runtime* runtime, api::effect_technique technique) {
 			char buffer[256];
 			runtime->get_technique_name(technique, buffer);
 			std::string name = buffer;
@@ -52,19 +52,19 @@ void on_reshade_finish_effects(effect_runtime* runtime, command_list* cmd_list, 
 	}
 }
 
-reshade::api::resource_view rtv;
 
-void on_bind_render_targets_and_depth_stencil(reshade::api::command_list* cmd_list, uint32_t count, const reshade::api::resource_view* rtvs, reshade::api::resource_view dsv)
+
+void on_bind_render_targets_and_depth_stencil(api::command_list* cmd_list, uint32_t count, const api::resource_view* rtvs, api::resource_view dsv)
 {
-	rtv = rtvs[0];
+	true_rtv = rtvs[0];
 }
 
 
 void register_addon_events()
 {
-	reshade::register_event<reshade::addon_event::reshade_begin_effects>(on_reshade_begin_effects);
-	reshade::register_event<reshade::addon_event::reshade_finish_effects>(on_reshade_finish_effects);
-	reshade::register_event<reshade::addon_event::bind_render_targets_and_depth_stencil>(on_bind_render_targets_and_depth_stencil);
+	register_event<addon_event::reshade_begin_effects>(on_reshade_begin_effects);
+	register_event<addon_event::reshade_finish_effects>(on_reshade_finish_effects);
+	register_event<addon_event::bind_render_targets_and_depth_stencil>(on_bind_render_targets_and_depth_stencil);
 }
 
 
@@ -108,7 +108,7 @@ float GetInteriorID()
 void RenderEffects()
 	{
 	if (m_runtime) {
-		m_runtime->enumerate_uniform_variables(nullptr, [&](reshade::api::effect_runtime* runtime, reshade::api::effect_uniform_variable variable) {
+		m_runtime->enumerate_uniform_variables(nullptr, [&](api::effect_runtime* runtime, api::effect_uniform_variable variable) {
 			char annotation_value[128];
 			if (runtime->get_annotation_string_from_uniform_variable(variable, "source", annotation_value)) {
 				std::string annotation = annotation_value;
@@ -140,7 +140,7 @@ void RenderEffects()
 		});
 
 		validPass = true;
-		m_runtime->render_effects(m_cmdlist, rtv);
+		m_runtime->render_effects(m_cmdlist, true_rtv);
 	}
 }
 
@@ -156,7 +156,7 @@ void hk_ProcessImageSpaceShaders(NiDX9Renderer* Renderer, BSRenderedTexture* Ren
 
 void Load()
 {
-	if (reshade::register_addon(m_hModule)) {
+	if (register_addon(m_hModule)) {
 		PrintLog("Registered addon");
 		register_addon_events();
 		// Pre-UI Hook for rendering effects
