@@ -1,0 +1,3 @@
+[submodule "external/JIP-LN-NVSE"]
+	path = external/JIP-LN-NVSE
+	url = https://github.com/doodlum/JIP-LN-NVSE-Library.git
