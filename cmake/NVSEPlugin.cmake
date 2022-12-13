@@ -43,16 +43,6 @@ target_precompile_headers(
 		include/PCH.h
 )
 
-target_include_directories(
-	"${PROJECT_NAME}"
-	PUBLIC
-		${CMAKE_CURRENT_SOURCE_DIR}/include
-	PRIVATE
-		${CMAKE_CURRENT_BINARY_DIR}/cmake
-		${CMAKE_CURRENT_SOURCE_DIR}/src
-		${CMAKE_CURRENT_SOURCE_DIR}/external/JIP-LN-NVSE
-)
-
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_DEBUG OFF)
 
@@ -99,11 +89,3 @@ if (CMAKE_GENERATOR MATCHES "Visual Studio")
 			/wd5220 # 'member': a non-static data member with a volatile qualified type no longer implies that compiler generated copy / move constructors and copy / move assignment operators are not trivial
 	)
 endif()
-
-find_package(fmt CONFIG REQUIRED)
-
-target_link_libraries(
-	${PROJECT_NAME} 
-	PRIVATE
-		fmt::fmt
-)

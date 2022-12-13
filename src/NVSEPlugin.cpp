@@ -1,11 +1,13 @@
 #include <NVSE/PluginAPI.h>
 #include <reshade/reshade.hpp>
 
+#include <detours.h>
+
 using namespace reshade;
 
 HMODULE m_hModule = nullptr;
 
-api::effect_runtime* m_runtime = nullptr;
+api::effect_runtime*     m_runtime = nullptr;
 api::command_list*       m_cmdlist = nullptr;
 api::resource_view       m_rtv;
 api::resource_view       m_rtv_srgb;
@@ -52,13 +54,10 @@ void on_reshade_finish_effects(api::effect_runtime* runtime, api::command_list* 
 	}
 }
 
-
-
 void on_bind_render_targets_and_depth_stencil(api::command_list* cmd_list, uint32_t count, const api::resource_view* rtvs, api::resource_view dsv)
 {
 	true_rtv = rtvs[0];
 }
-
 
 void register_addon_events()
 {
@@ -66,8 +65,6 @@ void register_addon_events()
 	register_event<addon_event::reshade_finish_effects>(on_reshade_finish_effects);
 	register_event<addon_event::bind_render_targets_and_depth_stencil>(on_bind_render_targets_and_depth_stencil);
 }
-
-
 
 extern "C" __declspec(dllexport) const char* NAME = "FNV ReShade Helper";
 extern "C" __declspec(dllexport) const char* DESCRIPTION = "Renders ReShade effects before the UI, by Wall_SoGB and doodlez";
@@ -81,9 +78,6 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID)
 	}
 	return TRUE;
 }
-
-UInt32 base_DrawWorld = 0x875FD0;
-UInt32 func_ProcessImageSpaceShaders = 0x559450;
 
 float GetWorldspaceID()
 {
@@ -106,7 +100,7 @@ float GetInteriorID()
 }
 
 void RenderEffects()
-	{
+{
 	if (m_runtime) {
 		m_runtime->enumerate_uniform_variables(nullptr, [&](api::effect_runtime* runtime, api::effect_uniform_variable variable) {
 			char annotation_value[128];
@@ -146,9 +140,10 @@ void RenderEffects()
 
 class BSRenderedTexture;
 
-void hk_ProcessImageSpaceShaders(NiDX9Renderer* Renderer, BSRenderedTexture* RenderedTexture1, BSRenderedTexture* RenderedTexture2)
+void(__cdecl* ProcessImageSpaceShaders)(NiDX9Renderer*, BSRenderedTexture*, BSRenderedTexture*) = (void(__cdecl*)(NiDX9Renderer*, BSRenderedTexture*, BSRenderedTexture*))0x00B55AC0;
+void __cdecl ProcessImageSpaceShadersHook(NiDX9Renderer* Renderer, BSRenderedTexture* RenderedTexture1, BSRenderedTexture* RenderedTexture2)
 {
-	StdCall(func_ProcessImageSpaceShaders, Renderer, RenderedTexture1, RenderedTexture2);
+	ProcessImageSpaceShaders(Renderer, RenderedTexture1, RenderedTexture2);
 	if (!RenderedTexture2) {
 		RenderEffects();
 	}
@@ -160,7 +155,10 @@ void Load()
 		PrintLog("Registered addon");
 		register_addon_events();
 		// Pre-UI Hook for rendering effects
-		WriteRelCall(base_DrawWorld + 0x173, (UInt32)&hk_ProcessImageSpaceShaders);
+		DetourTransactionBegin();
+		DetourUpdateThread(GetCurrentThread());
+		DetourAttach(&(PVOID&)ProcessImageSpaceShaders, &ProcessImageSpaceShadersHook);
+		DetourTransactionCommit();
 		PrintLog("Installed render hook");
 	} else {
 		PrintLog("ReShade not present, not installing hook");
